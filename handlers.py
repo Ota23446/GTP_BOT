@@ -2,11 +2,6 @@ import os
 import logging
 import openpyxl
 from datetime import datetime, timedelta
-from aiogram import Router, F
-from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, CallbackQuery
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import ADMIN_USERS
@@ -17,6 +12,13 @@ from utils import (
     is_valid_username
 )
 from services import get_next_shift, calculate_worked_time
+from aiogram import Router, F
+from aiogram.filters import Command, CommandStart
+from aiogram.types import Message, CallbackQuery
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from keyboards import get_main_keyboard, get_settings_keyboard, get_notification_settings_keyboard
+
 
 # Настройка логирования
 logging.basicConfig(
@@ -32,22 +34,131 @@ class NotificationStates(StatesGroup):
     waiting_for_username = State()
 
 
-# Базовые команды
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     username = user_manager.get_user_by_telegram_id(str(message.from_user.id))
     if username:
         await message.answer(
-            f"Добро пожаловать обратно!\n"
-            f"Ваш username: {username}\n"
-            f"Используйте /help для просмотра доступных команд."
+            f"👋 Добро пожаловать!\n"
+            f"Ваш логин: {username}",
+            reply_markup=get_main_keyboard()
         )
     else:
         await message.answer(
-            "Добро пожаловать!\n"
-            "Для начала работы необходимо привязать ваш username.\n"
+            "👋 Добро пожаловать!\n"
+            "Для начала работы необходимо привязать ваш логин.\n"
             "Используйте команду /register sm_username"
         )
+
+
+@router.message(F.text == "⚙️ Настройки")
+async def show_settings(message: Message):
+    username = user_manager.get_user_by_telegram_id(str(message.from_user.id))
+    if not username:
+        await message.answer("Сначала необходимо привязать username через /register")
+        return
+
+    await message.answer(
+        "⚙️ Настройки:",
+        reply_markup=get_settings_keyboard()
+    )
+
+
+@router.message(F.text == "🗓 Ближайшие смены")
+async def show_shifts(message: Message):
+    username = user_manager.get_user_by_telegram_id(str(message.from_user.id))
+    if not username:
+        await message.answer(
+            "⚠️ Для просмотра смен необходимо привязать логин.\n"
+            "Используйте команду /register sm_username"
+        )
+        return
+
+    shifts = await get_next_shift(username)
+    await message.answer(shifts)
+
+
+@router.message(F.text == "⏱ Учёт рабочего времени")
+async def show_worked_time(message: Message):
+    username = user_manager.get_user_by_telegram_id(str(message.from_user.id))
+    if not username:
+        await message.answer(
+            "⚠️ Для просмотра рабочего времени необходимо привязать логин.\n"
+            "Используйте команду /register sm_username"
+        )
+        return
+
+    worked_time = await calculate_worked_time(username)
+    await message.answer(worked_time)
+
+
+@router.message(F.text == "ℹ️ Помощь")
+async def show_help(message: Message):
+    help_text = (
+        "🤖 <b>Возможности бота:</b>\n\n"
+        "🗓 <b>Ближайшие смены</b>\n"
+        "• Просмотр графика на ближайшие дни\n"
+        "• Время начала и окончания смен\n\n"
+        "⏱ <b>Учёт рабочего времени</b>\n"
+        "• Подсчёт отработанных часов\n"
+        "• Статистика по сменам\n\n"
+        "⚙️ <b>Настройки</b>\n"
+        "• Настройка уведомлений\n"
+        "• Выбор времени оповещений\n"
+        "• Управление учётной записью\n\n"
+        "📝 <b>Основные команды:</b>\n"
+        "/register - привязка логина\n"
+        "/start - перезапуск бота"
+    )
+    await message.answer(help_text, parse_mode="HTML")
+
+
+# Обработчики callback-запросов для inline-кнопок
+@router.callback_query(F.data == "set_time")
+async def process_time_setting(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(NotificationStates.waiting_for_time)
+    await callback.message.answer("⏰ Введите желаемое время уведомлений в формате ЧЧ:ММ (например, 19:00)")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "notifications")
+async def process_notifications_setting(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "🔔 Настройка уведомлений:",
+        reply_markup=get_notification_settings_keyboard()
+    )
+
+
+@router.callback_query(F.data == "status")
+async def process_status(callback: CallbackQuery):
+    username = user_manager.get_user_by_telegram_id(str(callback.from_user.id))
+    if not username:
+        await callback.answer("Сначала привяжите username!")
+        return
+
+    user_data = user_manager.get_user_settings(username)
+    status_text = (
+        f"👤 Username: {username}\n"
+        f"⏰ Время уведомлений: {user_data['notification_time']}\n\n"
+        "🔔 Статус уведомлений:\n"
+    )
+    for notif_key, notif_name in NOTIFICATION_TYPES.items():
+        status = user_data["notifications"][notif_key]
+        status_text += f"{'✅' if status else '❌'} {notif_name}\n"
+
+    await callback.message.edit_text(
+        status_text,
+        reply_markup=get_settings_keyboard()
+    )
+
+
+@router.callback_query(F.data == "main_menu")
+async def process_return_to_main(callback: CallbackQuery):
+    await callback.message.delete()
+    await callback.message.answer(
+        "Главное меню",
+        reply_markup=get_main_keyboard()
+    )
 
 
 @router.message(Command("help"))
@@ -120,9 +231,10 @@ async def cmd_settings(message: Message):
 # Обработка нажатий на кнопки настроек
 @router.callback_query(F.data.startswith("toggle_"))
 async def process_notification_toggle(callback: CallbackQuery):
+    """Обработка переключения статуса уведомлений"""
     username = user_manager.get_user_by_telegram_id(str(callback.from_user.id))
     if not username:
-        await callback.answer("Ошибка: пользователь не найден", show_alert=True)
+        await callback.answer("Сначала привяжите username!", show_alert=True)
         return
 
     notif_type = callback.data.split("_")[1]
@@ -132,20 +244,32 @@ async def process_notification_toggle(callback: CallbackQuery):
     # Инвертируем статус уведомления
     user_manager.update_user_notifications(username, notif_type, not current_status)
 
-    # Обновляем клавиатуру
-    builder = InlineKeyboardBuilder()
+    # Получаем обновленные данные
     user_data = user_manager.get_user_settings(username)
 
-    for nk, nn in NOTIFICATION_TYPES.items():
-        status = user_data["notifications"][nk]
-        builder.button(
-            text=f"{nn}: {format_notification_status(status)}",
-            callback_data=f"toggle_{nk}"
-        )
-    builder.adjust(1)
+    # Формируем обновленный текст статуса
+    notification_text = "🔔 Настройка уведомлений:\n\n"
+    for key, name in NOTIFICATION_TYPES.items():
+        status = user_data["notifications"][key]
+        notification_text += f"{'✅' if status else '❌'} {name}\n"
 
-    await callback.message.edit_reply_markup(reply_markup=builder.as_markup())
-    await callback.answer()
+    # Обновляем сообщение с актуальным статусом
+    await callback.message.edit_text(
+        notification_text,
+        reply_markup=get_notification_settings_keyboard()
+    )
+
+    # Показываем уведомление о смене статуса
+    status_text = "включены" if not current_status else "отключены"
+    await callback.answer(f"Уведомления о {NOTIFICATION_TYPES[notif_type]} {status_text}")
+
+@router.callback_query(F.data == "back_to_settings")
+async def process_back_to_settings(callback: CallbackQuery):
+    """Возврат к основным настройкам"""
+    await callback.message.edit_text(
+        "⚙️ Настройки:",
+        reply_markup=get_settings_keyboard()
+    )
 
 
 # Изменение времени уведомлений
@@ -164,13 +288,77 @@ async def cmd_time(message: Message, state: FSMContext):
 
 @router.message(NotificationStates.waiting_for_time)
 async def process_notification_time(message: Message, state: FSMContext):
+    """Обработка установки времени уведомлений"""
     username = user_manager.get_user_by_telegram_id(str(message.from_user.id))
 
     if user_manager.update_notification_time(username, message.text):
-        await message.answer(f"Время уведомлений успешно обновлено на {message.text}")
+        await message.answer(
+            f"⏰ Время уведомлений успешно обновлено на {message.text}",
+            reply_markup=get_settings_keyboard()
+        )
     else:
-        await message.answer("Неверный формат времени. Используйте формат ЧЧ:ММ (например, 19:00)")
+        await message.answer(
+            "❌ Неверный формат времени. Используйте формат ЧЧ:ММ (например, 19:00)",
+            reply_markup=get_settings_keyboard()
+        )
 
+    await state.clear()
+
+@router.callback_query(F.data == "change_username")
+async def process_change_username(callback: CallbackQuery, state: FSMContext):
+    """Начало процесса изменения username"""
+    await state.set_state(NotificationStates.waiting_for_username)
+    await callback.message.answer(
+        "👤 Введите новый username в формате sm_username\n"
+        "Например: sm_ivan"
+    )
+    await callback.answer()
+
+
+class NotificationStates(StatesGroup):
+    waiting_for_time = State()
+    waiting_for_username = State()
+
+
+@router.message(NotificationStates.waiting_for_username)
+async def process_new_username(message: Message, state: FSMContext):
+    """Обработка нового username"""
+    new_username = message.text.lower()
+
+    if not await is_valid_username(new_username):
+        await message.answer(
+            "❌ Неверный формат username. Должен начинаться с 'sm_' и быть в нижнем регистре.",
+            reply_markup=get_settings_keyboard()
+        )
+        await state.clear()
+        return
+
+    data = user_manager.load_user_data()
+    if new_username not in data:
+        await message.answer(
+            "❌ Такой username не найден в системе.",
+            reply_markup=get_settings_keyboard()
+        )
+        await state.clear()
+        return
+
+    # Проверяем, не привязан ли уже этот username к другому пользователю
+    if data[new_username]["user_id"] != "0" and data[new_username]["user_id"] != str(message.from_user.id):
+        await message.answer(
+            "❌ Этот username уже привязан к другому пользователю.",
+            reply_markup=get_settings_keyboard()
+        )
+        await state.clear()
+        return
+
+    # Обновляем username
+    data[new_username]["user_id"] = str(message.from_user.id)
+    user_manager.save_user_data(data)
+
+    await message.answer(
+        f"✅ Username успешно изменен на {new_username}",
+        reply_markup=get_settings_keyboard()
+    )
     await state.clear()
 
 @router.message(Command("status"))
