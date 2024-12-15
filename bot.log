@@ -8123,3 +8123,33 @@ requests.exceptions.ConnectionError: HTTPConnectionPool(host='confluence.jira.la
 - Job(interval=1, unit=weeks, do=send_tuesday_notification, args=(), kwargs={})
 - Job(interval=1, unit=weeks, do=send_worked_time_notification, args=(), kwargs={})
 
+2024-12-15 03:26:38,999 - ERROR - Ошибка опроса бота: ('Connection aborted.', ConnectionResetError(10054, 'Удаленный хост принудительно разорвал существующее подключение', None, 10054, None))
+2024-12-15 03:29:28,883 - INFO - Cleared existing schedules
+2024-12-15 03:29:28,884 - INFO - Scheduled notifications for 19:00
+2024-12-15 03:29:28,884 - INFO - Scheduled notifications for 18:00
+2024-12-15 03:29:28,884 - INFO - Scheduled weekly notifications
+2024-12-15 03:29:28,884 - INFO - Scheduled tasks:
+- Job(interval=1, unit=days, do=update_schedule, args=(), kwargs={})
+- Job(interval=1, unit=weeks, do=clear_logs, args=(), kwargs={})
+- Job(interval=1, unit=days, do=send_shift_notifications_for_time, args=('19:00',), kwargs={})
+- Job(interval=1, unit=days, do=send_shift_notifications_for_time, args=('18:00',), kwargs={})
+- Job(interval=1, unit=weeks, do=send_monday_notification, args=(), kwargs={})
+- Job(interval=1, unit=weeks, do=send_tuesday_notification, args=(), kwargs={})
+- Job(interval=1, unit=weeks, do=send_worked_time_notification, args=(), kwargs={})
+
+2024-12-15 03:29:28,885 - INFO - Scheduler started
+2024-12-15 03:29:28,885 - INFO - Starting bot...
+2024-12-15 03:29:28,885 - INFO - Cleared existing schedules
+2024-12-15 03:29:28,886 - INFO - Scheduled notifications for 19:00
+2024-12-15 03:29:28,886 - INFO - Scheduled notifications for 18:00
+2024-12-15 03:29:28,887 - INFO - Scheduled weekly notifications
+2024-12-15 03:29:28,887 - INFO - Scheduled tasks:
+- Job(interval=1, unit=days, do=update_schedule, args=(), kwargs={})
+- Job(interval=1, unit=weeks, do=clear_logs, args=(), kwargs={})
+- Job(interval=1, unit=days, do=send_shift_notifications_for_time, args=('19:00',), kwargs={})
+- Job(interval=1, unit=days, do=send_shift_notifications_for_time, args=('18:00',), kwargs={})
+- Job(interval=1, unit=weeks, do=send_monday_notification, args=(), kwargs={})
+- Job(interval=1, unit=weeks, do=send_tuesday_notification, args=(), kwargs={})
+- Job(interval=1, unit=weeks, do=send_worked_time_notification, args=(), kwargs={})
+
+2024-12-15 03:42:51,616 - ERROR - Ошибка опроса бота: ('Connection aborted.', ConnectionResetError(10054, 'Удаленный хост принудительно разорвал существующее подключение', None, 10054, None))
