@@ -36,17 +36,21 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler
 from telegram.ext import filters
 from telebot import types
+from dotenv import load_dotenv
+import os
+
 locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
 
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, filename='bot.log',
                     format='%(asctime)s - %(levelname)s - %(message)s')
-
-BOT_TOKEN = "7935499658:AAHQFGrojf4VjmLSdth57x3NPf9mOSur3WI"
+# Загружаем переменные из .env
+load_dotenv()
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+ADMIN_USERS = set(os.getenv('ADMIN_USERS').split(','))
 EXCEL_FILE = 'schedule.xlsx'
 JSON_FILE = 'user_data.json'
-ADMIN_USERS = {"sm_kirillts", "5051477847", "1122334455"}
 MONTHS_RU = {
     1: "Январь",
     2: "Февраль",
