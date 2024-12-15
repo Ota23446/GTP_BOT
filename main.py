@@ -31,14 +31,7 @@ from pathlib import Path
 import shutil
 from dateutil.relativedelta import relativedelta
 import locale
-from datetime import datetime, date, timedelta
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler
-from telegram.ext import filters
-from telebot import types
 from dotenv import load_dotenv
-import os
-
 locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
 
 
@@ -851,7 +844,6 @@ def settings_command(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
-    logger.info(f"Получен callback: {call.data} от пользователя {call.from_user.id}")
     user_id = str(call.from_user.id)
     login = next((login for login, data in user_data.items() if data.get('user_id') == user_id), None)
 
@@ -860,7 +852,6 @@ def callback_handler(call):
             setting = call.data.replace('toggle_', '')
             user_data[login]['notifications'][setting] = not user_data[login]['notifications'][setting]
             save_user_data(user_data)
-            logger.info(f"Настройка '{setting}' изменена на {'Вкл' if user_data[login]['notifications'][setting] else 'Выкл'}")
 
             # Обновляем сообщение с настройками
             notifications = user_data[login]["notifications"]
@@ -897,15 +888,11 @@ def callback_handler(call):
                 text="Настройки уведомлений:",
                 reply_markup=markup
             )
-            logger.info("Сообщение с настройками обновлено.")
         elif call.data == 'set_time':
-            logger.info("Обработана команда 'set_time'")
             msg = bot.send_message(call.message.chat.id,
                                    "Введите время для уведомлений в формате ЧЧ:ММ (например, 18:00)")
             bot.register_next_step_handler(msg, process_time_setting, login)
-    else:
-        logger.warning(f"Пользователь с ID {user_id} не найден в user_data.")
-        bot.answer_callback_query(call.id, text="Вы не зарегистрированы в системе.")
+
 
 def process_time_setting(message, login):
     try:
@@ -938,124 +925,6 @@ def process_time_setting(message, login):
 def get_weekday_name(date):
     weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
     return weekdays[date.weekday()]
-
-def get_weeks_of_month(year, month):
-    print(f"Вызвана get_weeks_of_month с year={year}, month={month}")
-    """Возвращает список кортежей (начало_недели, конец_недели) для заданного месяца и года."""
-    cal = calendar.Calendar(firstweekday=calendar.MONDAY)
-    month_days = cal.itermonthdates(year, month)
-    weeks = []
-    week = []
-    for day in month_days:
-        if day.month == month:
-            week.append(day)
-            if day.weekday() == 6:  # Воскресенье
-                weeks.append((week[0], week[-1]))
-                week = []
-        elif week:  # Обработка последней недели месяца
-            weeks.append((week[0], week[-1]))
-            week = []
-    print(f"Возвращаем weeks: {weeks}")
-    return weeks
-
-def create_week_buttons(weeks):
-    print(f"Вызвана create_week_buttons с weeks: {weeks}")
-    keyboard = []
-    for start, end in weeks:
-        start_str = start.strftime('%Y%m%d')
-        end_str = end.strftime('%Y%m%d')
-        keyboard.append([InlineKeyboardButton(
-            f"{start.strftime('%d.%m')} - {end.strftime('%d.%m')}",
-            callback_data=f"week_{start_str}-{end_str}"
-        )])
-    print(f"Возвращаем keyboard: {keyboard}")
-    return InlineKeyboardMarkup(keyboard)
-
-def create_day_buttons(start_date, end_date):
-    """Создает кнопки для выбора дня в диапазоне."""
-    keyboard = []
-    current_row = []
-    delta = timedelta(days=1)
-    current_date = start_date
-    while current_date <= end_date:
-        current_row.append(InlineKeyboardButton(
-            current_date.strftime('%d.%m'),
-            callback_data=f"day_{current_date.strftime('%Y%m%d')}"
-        ))
-        if len(current_row) == 7 or current_date == end_date:
-            keyboard.append(current_row)
-            current_row = []
-        current_date += delta
-    return InlineKeyboardMarkup(keyboard)
-
-@bot.message_handler(commands=['check'])
-def check_command(message):
-    user_id = str(message.from_user.id)
-    login = next((login for login, data in user_data.items() if data.get('user_id') == user_id), None)
-
-    if not login:
-        bot.send_message(message.chat.id, "Вы не зарегистрированы в системе. Используйте /start для регистрации.")
-        return
-
-    # Предлагаем выбор между текущим и следующим месяцем
-    current_month = datetime.now().month
-    next_month = (current_month % 12) + 1
-    current_year = datetime.now().year
-    next_year = current_year if next_month > current_month else current_year + 1
-
-    keyboard = types.InlineKeyboardMarkup()
-    keyboard.row(types.InlineKeyboardButton("Текущий месяц", callback_data=f"month_{current_year}-{current_month}"))
-    keyboard.row(types.InlineKeyboardButton("Следующий месяц", callback_data=f"month_{next_year}-{next_month}"))
-
-    bot.send_message(message.chat.id, "Выберите месяц:", reply_markup=keyboard)
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('month_'))
-def callback_month(call):
-    bot.answer_callback_query(call.id)  # Обязательный ответ на callback_query
-    try:
-        year, month = call.data.split('_')[1].split('-')
-        print(f"Год: {year}, Месяц: {month}")  # Проверка значений
-        year, month = int(year), int(month)
-        weeks = get_weeks_of_month(year, month)
-        keyboard = create_week_buttons(weeks)
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text="Выберите неделю:",
-            reply_markup=keyboard
-        )
-    except Exception as e:
-        print(f"Ошибка в callback_month: {e}")
-        bot.answer_callback_query(call.id, text="Произошла ошибка при обработке запроса.")
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('week_'))
-def callback_week(call):
-    start, end = call.data.split('_')[1].split('-')
-    start_date = datetime.strptime(start, '%Y%m%d').date()
-    end_date = datetime.strptime(end, '%Y%m%d').date()
-    keyboard = create_day_buttons(start_date, end_date)
-    bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                          text="Выберите день:", reply_markup=keyboard)
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('day_'))
-def callback_day(call):
-    date_str = call.data.split('_')[1]
-    date = datetime.strptime(date_str, '%Y%m%d').date()
-    user_id = str(call.from_user.id)
-    login = next((login for login, data in user_data.items() if data.get('user_id') == user_id), None)
-
-    if login:
-        shifts, employee_name = get_user_info(login)
-        shift = next((shift for day, shift in shifts if day == date), None)
-        if shift:
-            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                  text=f"У вас {shift} смена в этот день.")
-        else:
-            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                  text="Информация о смене не найдена.")
-    else:
-        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                              text="Вы не зарегистрированы в системе.")
 
 def get_shift_description(shift):
     if shift in [1, 2, 3]:
