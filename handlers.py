@@ -41,7 +41,7 @@ async def cmd_start(message: Message):
         await message.answer(
             f"👋 Добро пожаловать!\n"
             f"Ваш логин: {username}",
-            reply_markup=get_main_keyboard()
+            reply_markup=get_main_keyboard()  # Используем инлайн-клавиатуру
         )
     else:
         await message.answer(
@@ -51,66 +51,118 @@ async def cmd_start(message: Message):
         )
 
 
-@router.message(F.text == "⚙️ Настройки")
-async def show_settings(message: Message):
-    username = user_manager.get_user_by_telegram_id(str(message.from_user.id))
-    if not username:
-        await message.answer("Сначала необходимо привязать username через /register")
-        return
+@router.callback_query(F.data == "settings")
+async def show_settings(callback: CallbackQuery):
+    """Обработка нажатия кнопки Настройки"""
+    try:
+        username = user_manager.get_user_by_telegram_id(str(callback.from_user.id))
+        if not username:
+            await callback.message.answer("Сначала необходимо привязать username через /register")
+            await callback.answer()
+            return
 
-    await message.answer(
-        "⚙️ Настройки:",
-        reply_markup=get_settings_keyboard()
-    )
-
-
-@router.message(F.text == "🗓 Ближайшие смены")
-async def show_shifts(message: Message):
-    username = user_manager.get_user_by_telegram_id(str(message.from_user.id))
-    if not username:
-        await message.answer(
-            "⚠️ Для просмотра смен необходимо привязать логин.\n"
-            "Используйте команду /register sm_username"
+        await callback.message.edit_text(
+            "⚙️ Настройки:",
+            reply_markup=get_settings_keyboard()
         )
-        return
+        await callback.answer()
 
-    shifts = await get_next_shift(username)
-    await message.answer(shifts)
+    except Exception as e:
+        logging.error(f"Error in show_settings: {e}")
+        await callback.answer("Произошла ошибка при открытии настроек")
 
 
-@router.message(F.text == "⏱ Учёт рабочего времени")
-async def show_worked_time(message: Message):
-    username = user_manager.get_user_by_telegram_id(str(message.from_user.id))
-    if not username:
-        await message.answer(
-            "⚠️ Для просмотра рабочего времени необходимо привязать логин.\n"
-            "Используйте команду /register sm_username"
+@router.callback_query(F.data == "shifts")
+async def show_shifts(callback: CallbackQuery):
+    """Обработка нажатия кнопки Ближайшие смены"""
+    try:
+        username = user_manager.get_user_by_telegram_id(str(callback.from_user.id))
+        if not username:
+            await callback.message.edit_text(
+                "⚠️ Для просмотра смен необходимо привязать логин.\n"
+                "Используйте команду /register sm_username",
+                reply_markup=get_main_keyboard()
+            )
+            await callback.answer()
+            return
+
+        shifts = await get_next_shift(username)
+        # Отправляем сообщение со сменами и кнопками меню
+        await callback.message.edit_text(
+            shifts,
+            reply_markup=get_main_keyboard()
         )
-        return
+        await callback.answer()
 
-    worked_time = await calculate_worked_time(username)
-    await message.answer(worked_time)
+    except Exception as e:
+        logging.error(f"Error in show_shifts: {e}")
+        await callback.message.edit_text(
+            "Произошла ошибка при получении информации о сменах",
+            reply_markup=get_main_keyboard()
+        )
+        await callback.answer()
 
 
-@router.message(F.text == "ℹ️ Помощь")
-async def show_help(message: Message):
-    help_text = (
-        "🤖 <b>Возможности бота:</b>\n\n"
-        "🗓 <b>Ближайшие смены</b>\n"
-        "• Просмотр графика на ближайшие дни\n"
-        "• Время начала и окончания смен\n\n"
-        "⏱ <b>Учёт рабочего времени</b>\n"
-        "• Подсчёт отработанных часов\n"
-        "• Статистика по сменам\n\n"
-        "⚙️ <b>Настройки</b>\n"
-        "• Настройка уведомлений\n"
-        "• Выбор времени оповещений\n"
-        "• Управление учётной записью\n\n"
-        "📝 <b>Основные команды:</b>\n"
-        "/register - привязка логина\n"
-        "/start - перезапуск бота"
-    )
-    await message.answer(help_text, parse_mode="HTML")
+@router.callback_query(F.data == "worked_time")
+async def show_worked_time(callback: CallbackQuery):
+    """Обработка нажатия кнопки Учёт рабочего времени"""
+    try:
+        username = user_manager.get_user_by_telegram_id(str(callback.from_user.id))
+        if not username:
+            await callback.message.edit_text(
+                "⚠️ Для просмотра рабочего времени необходимо привязать логин.\n"
+                "Используйте команду /register sm_username",
+                reply_markup=get_main_keyboard()
+            )
+            await callback.answer()
+            return
+
+        worked_time = await calculate_worked_time(username)
+        await callback.message.edit_text(
+            worked_time,
+            reply_markup=get_main_keyboard()
+        )
+        await callback.answer()
+
+    except Exception as e:
+        logging.error(f"Error in show_worked_time: {e}")
+        await callback.message.edit_text(
+            "Произошла ошибка при подсчете рабочего времени",
+            reply_markup=get_main_keyboard()
+        )
+        await callback.answer()
+
+
+@router.callback_query(F.data == "help")
+async def show_help(callback: CallbackQuery):
+    """Обработка нажатия кнопки Помощь"""
+    try:
+        help_text = (
+            "🤖 <b>Возможности бота:</b>\n\n"
+            "🗓 <b>Ближайшие смены</b>\n"
+            "• Просмотр графика на ближайшие дни\n"
+            "• Время начала и окончания смен\n\n"
+            "⏱ <b>Учёт рабочего времени</b>\n"
+            "• Подсчёт отработанных часов\n"
+            "• Статистика по сменам\n\n"
+            "⚙️ <b>Настройки</b>\n"
+            "• Настройка уведомлений\n"
+            "• Выбор времени оповещений\n"
+            "• Управление учётной записью\n\n"
+            "📝 <b>Основные команды:</b>\n"
+            "/register - привязка логина\n"
+            "/start - перезапуск бота"
+        )
+        await callback.message.edit_text(
+            help_text,
+            parse_mode="HTML",
+            reply_markup=get_main_keyboard()  # Добавляем кнопки меню
+        )
+        await callback.answer()
+
+    except Exception as e:
+        logging.error(f"Error in show_help: {e}")
+        await callback.answer("Произошла ошибка при открытии помощи")
 
 
 # Обработчики callback-запросов для inline-кнопок
@@ -178,29 +230,47 @@ async def cmd_help(message: Message):
 # Регистрация пользователя
 @router.message(Command("register"))
 async def cmd_register(message: Message):
-    args = message.text.split()
-    if len(args) != 2:
-        await message.answer("Использование: /register sm_username")
-        return
+    """Регистрация пользователя"""
+    try:
+        args = message.text.split()
+        if len(args) != 2:
+            await message.answer("Использование: /register sm_username")
+            return
 
-    username = args[1].lower()
-    if not await is_valid_username(username):
-        await message.answer("Неверный формат username. Должен начинаться с 'sm_' и быть в нижнем регистре.")
-        return
+        username = args[1].lower()
+        if not await is_valid_username(username):
+            await message.answer("Неверный формат username. Должен начинаться с 'sm_' и быть в нижнем регистре.")
+            return
 
-    data = user_manager.load_user_data()
-    if username not in data:
-        await message.answer("Такой username не найден в системе.")
-        return
+        # Загружаем текущие данные
+        data = user_manager.load_user_data()
 
-    # Проверяем, не привязан ли уже этот username к другому пользователю
-    if data[username]["user_id"] != "0" and data[username]["user_id"] != str(message.from_user.id):
-        await message.answer("Этот username уже привязан к другому пользователю.")
-        return
+        # Создаем структуру для нового пользователя
+        user_data = {
+            "user_id": str(message.from_user.id),
+            "notifications": {
+                "shift1": True,
+                "shift2": True,
+                "shift3": True,
+                "weekend_duty": True,
+                "day_off": True
+            },
+            "notification_time": "18:00"
+        }
 
-    data[username]["user_id"] = str(message.from_user.id)
-    user_manager.save_user_data(data)
-    await message.answer("Username успешно привязан!")
+        # Добавляем или обновляем пользователя
+        data[username] = user_data
+        user_manager.save_user_data(data)
+
+        await message.answer(
+            "✅ Username успешно привязан!\n"
+            f"Логин: {username}",
+            reply_markup=get_main_keyboard()
+        )
+
+    except Exception as e:
+        logging.error(f"Error in registration: {e}")
+        await message.answer("Произошла ошибка при регистрации. Попробуйте позже.")
 
 
 # Настройки уведомлений
@@ -232,36 +302,58 @@ async def cmd_settings(message: Message):
 @router.callback_query(F.data.startswith("toggle_"))
 async def process_notification_toggle(callback: CallbackQuery):
     """Обработка переключения статуса уведомлений"""
-    username = user_manager.get_user_by_telegram_id(str(callback.from_user.id))
-    if not username:
-        await callback.answer("Сначала привяжите username!", show_alert=True)
-        return
+    try:
+        # Проверка наличия username
+        username = user_manager.get_user_by_telegram_id(str(callback.from_user.id))
+        if not username:
+            await callback.answer("Сначала привяжите username!", show_alert=True)
+            return
 
-    notif_type = callback.data.split("_")[1]
-    user_data = user_manager.get_user_settings(username)
-    current_status = user_data["notifications"][notif_type]
+        # Получение типа уведомления из callback_data
+        notif_type = callback.data.split("_")[1]
 
-    # Инвертируем статус уведомления
-    user_manager.update_user_notifications(username, notif_type, not current_status)
+        # Проверяем, что тип уведомления существует в константах
+        if notif_type not in NOTIFICATION_TYPES:
+            await callback.answer(f"Неизвестный тип уведомления: {notif_type}", show_alert=True)
+            return
 
-    # Получаем обновленные данные
-    user_data = user_manager.get_user_settings(username)
+        user_data = user_manager.get_user_settings(username)
 
-    # Формируем обновленный текст статуса
-    notification_text = "🔔 Настройка уведомлений:\n\n"
-    for key, name in NOTIFICATION_TYPES.items():
-        status = user_data["notifications"][key]
-        notification_text += f"{'✅' if status else '❌'} {name}\n"
+        # Проверяем существование ключа в настройках пользователя
+        if notif_type not in user_data["notifications"]:
+            # Если ключа нет, инициализируем его
+            user_data["notifications"][notif_type] = True
+            user_manager.save_user_data(user_data)
 
-    # Обновляем сообщение с актуальным статусом
-    await callback.message.edit_text(
-        notification_text,
-        reply_markup=get_notification_settings_keyboard()
-    )
+        # Инвертируем статус уведомления
+        current_status = user_data["notifications"][notif_type]
+        user_manager.update_user_notifications(username, notif_type, not current_status)
 
-    # Показываем уведомление о смене статуса
-    status_text = "включены" if not current_status else "отключены"
-    await callback.answer(f"Уведомления о {NOTIFICATION_TYPES[notif_type]} {status_text}")
+        # Получаем обновленные данные
+        user_data = user_manager.get_user_settings(username)
+
+        # Формируем текст статуса
+        notification_text = "🔔 Настройка уведомлений:\n\n"
+        for key, name in NOTIFICATION_TYPES.items():
+            status = user_data["notifications"].get(key, False)
+            notification_text += f"{'✅' if status else '❌'} {name}\n"
+
+        # Обновляем сообщение
+        await callback.message.edit_text(
+            notification_text,
+            reply_markup=get_notification_settings_keyboard()
+        )
+
+        # Показываем уведомление о смене статуса
+        status_text = "включены" if not current_status else "отключены"
+        await callback.answer(
+            f"Уведомления '{NOTIFICATION_TYPES[notif_type]}' {status_text}",
+            show_alert=False
+        )
+
+    except Exception as e:
+        logging.error(f"Error in process_notification_toggle: {e}")
+        await callback.answer("Произошла ошибка при обновлении настроек", show_alert=True)
 
 @router.callback_query(F.data == "back_to_settings")
 async def process_back_to_settings(callback: CallbackQuery):

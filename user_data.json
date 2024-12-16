@@ -1,4 +1,14 @@
 {
+    "user_id": "5051477847",
+    "notifications": {
+        "shift1": true,
+        "shift2": true,
+        "shift3": true,
+        "weekend_duty": true,
+        "day_off": true,
+        "weekend": true
+    },
+    "notification_time": "18:00",
     "sm_kirillts": {
         "user_id": "5051477847",
         "notifications": {
@@ -9,93 +19,5 @@
             "day_off": true
         },
         "notification_time": "18:00"
-    },
-    "sm_alinafe": {
-        "user_id": "648386704",
-        "notifications": {
-            "shift1": true,
-            "shift2": true,
-            "shift3": true,
-            "weekend_duty": true,
-            "day_off": true
-        },
-        "notification_time": "18:00"
-    },
-    "sm_igorab": {
-        "user_id": "2003718222",
-        "notifications": {
-            "shift1": true,
-            "shift2": true,
-            "shift3": true,
-            "weekend_duty": true,
-            "day_off": true
-        },
-        "notification_time": "19:00"
-    },
-    "sm_ekaterinaef": {
-        "user_id": "635212230",
-        "notifications": {
-            "shift1": true,
-            "shift2": true,
-            "shift3": true,
-            "weekend_duty": true,
-            "day_off": true
-        },
-        "notification_time": "19:00"
-    },
-    "sm_nikitala": {
-        "user_id": "1329576966",
-        "notifications": {
-            "shift1": true,
-            "shift2": true,
-            "shift3": true,
-            "weekend_duty": true,
-            "day_off": true
-        },
-        "notification_time": "19:00"
-    },
-    "sm_tatianaka": {
-        "user_id": "692199864",
-        "notifications": {
-            "shift1": true,
-            "shift2": true,
-            "shift3": true,
-            "weekend_duty": true,
-            "day_off": true
-        },
-        "notification_time": "19:00"
-    },
-    "sm_alekseishl": {
-        "user_id": "386620047",
-        "notifications": {
-            "shift1": true,
-            "shift2": false,
-            "shift3": true,
-            "weekend_duty": true,
-            "day_off": false
-        },
-        "notification_time": "18:00"
-    },
-    "sm_daniilmal": {
-        "user_id": "547914305",
-        "notifications": {
-            "shift1": true,
-            "shift2": true,
-            "shift3": true,
-            "weekend_duty": true,
-            "day_off": true
-        },
-        "notification_time": "19:00"
-    },
-    "sm_ekaterinacy": {
-        "user_id": "547530608",
-        "notifications": {
-            "shift1": true,
-            "shift2": true,
-            "shift3": true,
-            "weekend_duty": true,
-            "day_off": true
-        },
-        "notification_time": "19:00"
     }
 }
