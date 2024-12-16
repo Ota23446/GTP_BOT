@@ -3,7 +3,7 @@ import logging
 import openpyxl
 from datetime import datetime, timedelta
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
+from keyboards import show_schedule_choice
 from config import ADMIN_USERS
 from utils import (
     UserDataManager,
@@ -11,6 +11,7 @@ from utils import (
     format_notification_status,
     is_valid_username
 )
+from keyboards import show_dates_for_month
 from services import get_next_shift, calculate_worked_time
 from aiogram import Router, F
 from aiogram.filters import Command, CommandStart
@@ -18,6 +19,9 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from keyboards import get_main_keyboard, get_settings_keyboard, get_notification_settings_keyboard
+from keyboards import show_specific_date_buttons
+from services import get_shift_for_date
+from aiogram import Bot
 
 
 # Настройка логирования
@@ -228,37 +232,49 @@ async def cmd_help(message: Message):
     await message.answer(help_text)
 
 # Регистрация пользователя
-@router.message(Command("register"))
-async def cmd_register(message: Message):
-    """Регистрация пользователя"""
-    try:
-        args = message.text.split()
-        if len(args) != 2:
-            await message.answer("Использование: /register sm_username")
-            return
+class RegistrationStates(StatesGroup):
+    waiting_for_username = State()
 
-        username = args[1].lower()
+@router.message(Command("register"))
+async def cmd_register(message: Message, state: FSMContext):
+    """Начало регистрации пользователя"""
+    user_manager = UserDataManager()
+    existing_username = user_manager.get_user_by_telegram_id(str(message.from_user.id))
+    if existing_username:
+        await message.answer(f"Вы уже зарегистрированы с логином: {existing_username}")
+        return
+
+    await state.set_state(RegistrationStates.waiting_for_username)
+    await message.answer("Пожалуйста, введите ваш логин в формате sm_username:")
+
+@router.message(RegistrationStates.waiting_for_username)
+async def process_username(message: Message, state: FSMContext, bot: Bot):
+    """Обработка введенного логина"""
+    try:
+        username = message.text.lower()
         if not await is_valid_username(username):
             await message.answer("Неверный формат username. Должен начинаться с 'sm_' и быть в нижнем регистре.")
             return
 
-        # Загружаем текущие данные
+        user_manager = UserDataManager()
         data = user_manager.load_user_data()
 
-        # Создаем структуру для нового пользователя
+        if username in data:
+            await message.answer("Этот логин уже зарегистрирован. Попробуйте другой.")
+            return
+
         user_data = {
             "user_id": str(message.from_user.id),
             "notifications": {
                 "shift1": True,
                 "shift2": True,
                 "shift3": True,
-                "weekend_duty": True,
-                "day_off": True
+                "weekend": True,
+                "dayoff": True
             },
             "notification_time": "18:00"
         }
 
-        # Добавляем или обновляем пользователя
         data[username] = user_data
         user_manager.save_user_data(data)
 
@@ -267,10 +283,12 @@ async def cmd_register(message: Message):
             f"Логин: {username}",
             reply_markup=get_main_keyboard()
         )
+        await state.clear()
 
     except Exception as e:
         logging.error(f"Error in registration: {e}")
         await message.answer("Произошла ошибка при регистрации. Попробуйте позже.")
+        await state.clear()
 
 
 # Настройки уведомлений
@@ -592,3 +610,47 @@ async def cmd_check_cell(message: Message):
         wb.close()
     except Exception as e:
         await message.answer(f"🚫 Ошибка при проверке: {str(e)}")
+
+async def process_schedule_day(callback: CallbackQuery, month: int, day: int):
+    """Обрабатывает выбор конкретной даты и показывает смену"""
+    user_id = str(callback.from_user.id)
+    username = user_manager.get_user_by_telegram_id(user_id)
+    if not username:
+        await callback.message.answer("Сначала зарегистрируйтесь! /register")
+        return
+
+    current_date = datetime.now()
+    year = current_date.year
+    if month > 12:
+        year += 1
+
+    target_date = datetime(year, month, day)
+
+    filename = "schedule.xlsx" if month == current_date.month else "schedule_next.xlsx"
+    shift_info = await get_shift_for_date(username, target_date, filename)
+    await callback.message.answer(shift_info)
+    await callback.message.answer("Главное меню:", reply_markup=get_main_keyboard())
+
+@router.callback_query(F.data.startswith("schedule_month:"))
+async def callback_schedule_month(callback: CallbackQuery):
+    month = int(callback.data.split(":")[1])
+    await show_dates_for_month(callback, month)
+
+
+@router.callback_query(F.data.startswith("schedule_dates:"))
+async def callback_schedule_dates(callback: CallbackQuery):
+    _, month_str, days_range = callback.data.split(":")
+    month = int(month_str)
+    await show_specific_date_buttons(callback, month, days_range)
+
+
+@router.callback_query(F.data.startswith("schedule_day:"))
+async def callback_schedule_day(callback: CallbackQuery):
+    _, month_str, day_str = callback.data.split(":")
+    month = int(month_str)
+    day = int(day_str)
+    await process_schedule_day(callback, month, day)
+
+@router.callback_query(F.data == "check_shift")
+async def callback_check_shift(callback: CallbackQuery):
+    await show_schedule_choice(callback)

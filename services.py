@@ -9,7 +9,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import requests
 from config import MONTHS_RU, WEEKDAYS
-
+from utils import parse_time
+from aiogram.types import CallbackQuery
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO,
@@ -19,10 +20,8 @@ logging.basicConfig(level=logging.INFO,
 async def send_notifications(bot):
     """Общая функция для отправки уведомлений"""
     try:
-        # Запускаем все типы уведомлений
         await asyncio.gather(
             send_shift_notifications(bot),
-            start_weekly_notifications(bot)
         )
     except Exception as e:
         logging.error(f"Error in send_notifications: {e}")
@@ -255,35 +254,40 @@ def _calculate_worked_time_sync(login):
 async def send_shift_notifications(bot):
     """Отправка уведомлений о сменах"""
     try:
-        user_data = await load_user_data()
+        user_data = await load_user_data()  # Предполагается, что эта функция есть
         current_date = datetime.now()
         tomorrow = current_date + timedelta(days=1)
 
         wb = await asyncio.to_thread(openpyxl.load_workbook, 'schedule.xlsx')
         ws = wb.active
 
+        login_row_map = {}
+        for row in ws.iter_rows():
+            login = str(row[2].value).lower() if row[2].value else None
+            if login:
+                login_row_map[login] = row[2].row
+
         for login, data in user_data.items():
             try:
                 user_id = data.get('user_id')
+                if not user_id:
+                    logging.warning(f"No user_id found for {login}")
+                    continue
+
                 notifications = data.get('notifications', {})
                 notification_time = data.get('notification_time', "18:00")
 
-                if current_date.strftime("%H:%M") != notification_time:
+                current_time = parse_time(current_date.strftime("%H:%M"))
+                notification_time_obj = parse_time(notification_time)
+
+                if current_time != notification_time_obj:
                     continue
 
-                # Поиск пользователя в таблице
-                login_cell = None
-                for row in ws.iter_rows():
-                    for cell in row:
-                        if cell.value and str(cell.value).lower() == login.lower():
-                            login_cell = cell
-                            break
-                    if login_cell:
-                        break
 
-                if login_cell:
-                    tomorrow_col = tomorrow.day + 1  # +1 так как первая колонка - логин
-                    shift = ws.cell(row=login_cell.row, column=tomorrow_col).value
+                login_row = login_row_map.get(login.lower())
+                if login_row:
+                    tomorrow_col = tomorrow.day + 3  #
+                    shift = ws.cell(row=login_row, column=tomorrow_col).value
 
                     if shift:
                         shift = str(shift).strip()
@@ -344,20 +348,6 @@ async def send_tuesday_notification(bot):
         except Exception as e:
             logging.error(f"Error sending Tuesday notification: {e}")
 
-
-async def start_weekly_notifications(bot):
-    """Запуск еженедельных уведомлений"""
-    while True:
-        try:
-            now = datetime.now()
-            if now.weekday() == 0 and now.strftime("%H:%M") == "09:30":
-                await send_monday_notification(bot)
-            elif now.weekday() == 1 and now.strftime("%H:%M") == "09:30":
-                await send_tuesday_notification(bot)
-            await asyncio.sleep(60)
-        except Exception as e:
-            logging.error(f"Error in weekly notifications: {e}")
-            await asyncio.sleep(60)
 
 
 # Добавляем вспомогательную функцию для проверки активности пользователей
@@ -425,7 +415,7 @@ async def get_next_shift(login):
                     continue
 
                 # Смены начинаются с 4-й колонки, поэтому добавляем 3 к номеру дня
-                day_col = date.day + 3
+                day_col = date.day + 2
                 shift = ws.cell(row=login_row, column=day_col).value
 
                 # Получаем день недели на русском
@@ -486,3 +476,66 @@ async def get_next_shift(login):
     except Exception as e:
         logging.error(f"Error in get_next_shift for {login}: {e}")
         return f"Ошибка при получении информации о сменах: {str(e)}"
+
+async def get_shift_for_date(login, target_date, filename):
+    """Получает смену пользователя на заданную дату из указанного файла"""
+    try:
+        wb = await asyncio.to_thread(openpyxl.load_workbook, filename)
+        ws = wb.active
+
+        login_row_map = {}
+        for row in ws.iter_rows():
+            login_val = str(row[2].value).lower() if row[2].value else None
+            if login_val:
+                login_row_map[login_val] = row[2].row
+
+        login_row = login_row_map.get(login.lower())
+        if not login_row:
+            return f"Логин {login} не найден в расписании."
+
+        day_col = target_date.day + 3
+        shift_value = ws.cell(row=login_row, column=day_col).value
+        wb.close()
+
+        if shift_value:
+            shift_str = str(shift_value).strip()
+            if shift_str == "1":
+                shift_text = "первая смена"
+            elif shift_str == "2":
+                shift_text = "вторая смена"
+            elif shift_str == "3":
+                shift_text = "третья смена"
+            elif shift_str.upper() in ['В', 'B', 'в']:
+                shift_text = "дежурство"
+            else:
+                shift_text = "выходной"
+
+            return f"{target_date.strftime('%d.%m.%Y')} - {shift_text}"
+
+        else:
+            return f"Смена не назначена на {target_date.strftime('%d.%m.%Y')}"
+
+    except FileNotFoundError:
+        return "Файл расписания не найден."
+    except Exception as e:
+        logging.error(f"Error getting shift for date: {e}")
+        return f"Ошибка при получении смены: {e}"
+
+async def process_schedule_day(callback: CallbackQuery, month: int, day: int):
+    """Обрабатывает выбор конкретной даты и показывает смену"""
+    user_id = str(callback.from_user.id)
+    username = user_manager.get_user_by_telegram_id(user_id)
+    if not username:
+        await callback.message.answer("Сначала зарегистрируйтесь! /register")
+        return
+
+    current_date = datetime.now()
+    year = current_date.year
+    if month > 12:
+        year += 1
+
+    target_date = datetime(year, month, day)
+
+    filename = "schedule.xlsx" if month == current_date.month else "schedule_next.xlsx"
+    shift_info = await get_shift_for_date(username, target_date, filename)
+    await callback.message.answer(shift_info)

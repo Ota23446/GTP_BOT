@@ -1,22 +1,23 @@
 {
-    "user_id": "5051477847",
-    "notifications": {
-        "shift1": true,
-        "shift2": true,
-        "shift3": true,
-        "weekend_duty": true,
-        "day_off": true,
-        "weekend": true
-    },
-    "notification_time": "18:00",
     "sm_kirillts": {
         "user_id": "5051477847",
         "notifications": {
             "shift1": true,
             "shift2": true,
             "shift3": true,
-            "weekend_duty": true,
-            "day_off": true
+            "weekend": true,
+            "dayoff": true
+        },
+        "notification_time": "21:31"
+    },
+    "sm_alinafe": {
+        "user_id": "648386704",
+        "notifications": {
+            "shift1": true,
+            "shift2": true,
+            "shift3": true,
+            "weekend": true,
+            "dayoff": true
         },
         "notification_time": "18:00"
     }
