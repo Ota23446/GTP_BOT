@@ -1,38 +1,59 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardButton
+from utils import NOTIFICATION_TYPES
 
-def get_main_keyboard() -> ReplyKeyboardMarkup:
-    """Главное меню с основными функциями"""
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.row(
-        KeyboardButton("🗓 Ближайшие смены"),
-        KeyboardButton("⏱ Учёт рабочего времени")
-    )
-    keyboard.row(
-        KeyboardButton("⚙️ Настройки"),
-        KeyboardButton("ℹ️ Помощь")
-    )
-    return keyboard
 
-def get_settings_keyboard() -> InlineKeyboardMarkup:
-    """Меню настроек"""
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    keyboard.add(
-        InlineKeyboardButton("⏰ Время уведомлений", callback_data="set_time"),
-        InlineKeyboardButton("🔔 Настройка уведомлений", callback_data="notifications"),
-        InlineKeyboardButton("👤 Изменить логин", callback_data="change_username"),
-        InlineKeyboardButton("📊 Мои настройки", callback_data="status"),
-        InlineKeyboardButton("◀️ Вернуться в меню", callback_data="main_menu")
-    )
-    return keyboard
+def get_main_keyboard():
+    """Создание основной клавиатуры"""
+    builder = InlineKeyboardBuilder()
 
-def get_notification_settings_keyboard() -> InlineKeyboardMarkup:
-    """Меню настройки оповещений"""
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    keyboard.add(
-        InlineKeyboardButton("🌅 Первая смена (8:00-16:30)", callback_data="toggle_shift1"),
-        InlineKeyboardButton("🌞 Вторая смена (9:30-18:00)", callback_data="toggle_shift2"),
-        InlineKeyboardButton("🌆 Третья смена (11:30-20:00)", callback_data="toggle_shift3"),
-        InlineKeyboardButton("📆 Дежурство в выходной", callback_data="toggle_weekend_duty"),
-        InlineKeyboardButton("↩️ Вернуться в настройки", callback_data="back_to_settings")
+    buttons = [
+        ("🗓 Ближайшие смены", "shifts"),
+        ("⏱ Учёт рабочего времени", "worked_time"),
+        ("⚙️ Настройки", "settings"),
+        ("ℹ️ Помощь", "help")
+    ]
+
+    for text, callback_data in buttons:
+        builder.button(
+            text=text,
+            callback_data=callback_data
+        )
+
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_settings_keyboard():
+    """Создание клавиатуры настроек"""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔔 Настройка уведомлений", callback_data="notifications")
+    builder.button(text="⏰ Изменить время уведомлений", callback_data="set_time")
+    builder.button(text="👤 Изменить username", callback_data="change_username")
+    builder.button(text="📊 Текущие настройки", callback_data="status")
+    builder.button(text="◀️ Главное меню", callback_data="main_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_notification_settings_keyboard():
+    """Создание клавиатуры настроек уведомлений"""
+    builder = InlineKeyboardBuilder()
+
+    # Добавляем кнопки для каждого типа уведомлений
+    for notif_key, notif_name in NOTIFICATION_TYPES.items():
+        builder.button(
+            text=notif_name,
+            callback_data=f"toggle_{notif_key}"
+        )
+
+    # Добавляем кнопку возврата
+    builder.button(
+        text="◀️ Назад к настройкам",
+        callback_data="back_to_settings"
     )
-    return keyboard
+
+    # Устанавливаем расположение кнопок (по одной в ряд)
+    builder.adjust(1)
+
+    return builder.as_markup()

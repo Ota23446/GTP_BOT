@@ -4,11 +4,11 @@ from datetime import datetime, time
 
 # Константы для работы с уведомлениями
 NOTIFICATION_TYPES = {
-    "shift1": "первая смена",
-    "shift2": "вторая смена",
-    "shift3": "третья смена",
-    "weekend_duty": "выходной день",
-    "day_off": "отгул"
+    'shift1': 'Первая смена',
+    'shift2': 'Вторая смена',
+    'shift3': 'Третья смена',
+    'weekend': 'Дежурство в выходной',
+    'dayoff': 'Выходной день'
 }
 
 DEFAULT_NOTIFICATION_TIME = "19:00"

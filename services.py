@@ -295,9 +295,9 @@ async def send_shift_notifications(bot):
                             message = f"Завтра {tomorrow.strftime('%d.%m.%Y')} у вас 2 смена"
                         elif shift == "3" and notifications.get('shift3'):
                             message = f"Завтра {tomorrow.strftime('%d.%m.%Y')} у вас 3 смена"
-                        elif shift.upper() in ['В', 'B'] and notifications.get('weekend_duty'):
+                        elif shift.upper() in ['В', 'B'] and notifications.get('weekend'):
                             message = f"Завтра {tomorrow.strftime('%d.%m.%Y')} у вас дежурство"
-                        elif notifications.get('day_off'):
+                        elif notifications.get('dayoff'):
                             message = f"Завтра {tomorrow.strftime('%d.%m.%Y')} у вас выходной"
 
                         if message:
