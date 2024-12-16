@@ -11,6 +11,7 @@ from handlers import router as handlers_router
 from services import send_notifications
 from utils import UserDataManager
 from test import router as test_router
+from services import send_monday_notification, send_tuesday_notification
 
 # Настройка логирования
 logging.basicConfig(
@@ -47,7 +48,8 @@ async def on_startup():
         minute='*',
         kwargs={'bot': bot}
     )
-
+    scheduler.add_job(send_monday_notification, 'cron', day_of_week='mon', hour=9, minute=30, kwargs={'bot': bot})
+    scheduler.add_job(send_tuesday_notification, 'cron', day_of_week='tue', hour=9, minute=30, kwargs={'bot': bot})
     # Запуск планировщика
     scheduler.start()
 
